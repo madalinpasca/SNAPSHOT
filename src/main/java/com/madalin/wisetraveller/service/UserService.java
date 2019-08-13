@@ -102,26 +102,32 @@ public class UserService {
 
     private User createFacebookUser(FacebookApiResponse response) {
         User user = new User();
-        String nume = response.get("name");
-        user.setNume(nume == null ? "User" : nume);
-        String email = response.get("email");
-        user.setEmail(email == null ? user.getNume().replaceAll("\\s", "").toLowerCase()
-                + "@facebook.com" : email);
-        user.setUsername(user.getEmail());
+        setNamesFacebook(response, user);
         user.setUserProvidedId(response.getId());
         user.setTipUser(TipUser.Facebook);
         userRepository.save(user);
         return user;
     }
 
-    private void updateFacebookUser(User user, FacebookApiResponse response) {
-        String nume = response.get("name");
-        if (nume != null)
+    private void setNamesFacebook(FacebookApiResponse response, User user) {
+        String nume = response.get("first_name");
+        if (nume != null && !nume.trim().isEmpty())
             user.setNume(nume);
+        String prenume = response.get("last_name");
+        if (prenume != null && !prenume.trim().isEmpty())
+            user.setPrenume(prenume);
+        if (user.getNume() == null && user.getPrenume() == null)
+            user.setNume("User");
         String email = response.get("email");
-        if (email != null)
-            user.setEmail(email);
+        String fullname = (nume + " " + prenume).trim();
+        user.setEmail(email == null ? fullname.replaceAll("\\s", "").toLowerCase()
+                + "@facebook.com" : email);
         user.setUsername(user.getEmail());
+        user.setUrlProfil("");
+    }
+
+    private void updateFacebookUser(User user, FacebookApiResponse response) {
+        setNamesFacebook(response, user);
         userRepository.save(user);
     }
 

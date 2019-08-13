@@ -11,15 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:4200")
 @AllArgsConstructor(onConstructor = @__({@Autowired}))
 public class UserContoller {
     private UserService userService;
-
-    @GetMapping("/unauthenticated/Asta")
-    public String hw (){
-        return "Hello World!";
-    }
 
     @GetMapping("/authenticated/getAll")
     public ResponseEntity<?> buuuun (){

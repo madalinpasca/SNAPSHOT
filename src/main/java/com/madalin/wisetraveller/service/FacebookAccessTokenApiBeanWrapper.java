@@ -15,7 +15,7 @@ public class FacebookAccessTokenApiBeanWrapper {
             accessTokenApi = new FacebookAccessTokenApi.Builder()
                     .setMajorVersion(3)
                     .setMinorVersion(3)
-                    .setFields(Arrays.asList("id", "email", "name"))
+                    .setFields(Arrays.asList("id", "email", "first_name", "last_name"))
                     .build();
         }
         return accessTokenApi;

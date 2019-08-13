@@ -18,10 +18,10 @@ public class User {
     @Column
     private String username;
 
-    @Column
+    @Column(nullable = false)
     private String nume;
 
-    @Column
+    @Column(nullable = false)
     private String prenume;
 
     @Column
@@ -30,13 +30,15 @@ public class User {
     @Column(nullable = false)
     private String email;
 
-    @Column(nullable = true)
+    @Column
     private String parola;
 
-    @Column (nullable = true)
+    @Column
     private String userProvidedId;
 
-    @Column(nullable = true)
+    @Column
     private TipUser tipUser;
 
+    @Column
+    private String urlProfil;
 }
