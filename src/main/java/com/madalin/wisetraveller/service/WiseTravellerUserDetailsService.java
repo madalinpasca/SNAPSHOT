@@ -22,9 +22,8 @@ public class WiseTravellerUserDetailsService implements UserDetailsService {
     @Transactional
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(username).orElseGet(()->
-                userRepository.findByUsername(username).orElseThrow(()->
-                        new UsernameNotFoundException("No user with that username or email")));
+        User user = userRepository.findByEmail(username).orElseThrow(()->
+                        new UsernameNotFoundException("No user with that email"));
         return createUserDetails(user);
     }
 
@@ -34,7 +33,7 @@ public class WiseTravellerUserDetailsService implements UserDetailsService {
         return WiseTravellerUserDetails.builder()
                 .authorities(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")))
                 .password(user.getParola())
-                .username(user.getUsername())
+                .username(user.getEmail())
                 .id(user.getId())
                 .build();
     }

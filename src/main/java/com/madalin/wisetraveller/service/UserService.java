@@ -3,8 +3,10 @@ package com.madalin.wisetraveller.service;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.madalin.wisetraveller.model.FacebookApiResponse;
+import com.madalin.wisetraveller.model.FacebookProfilePictureResponse;
 import com.madalin.wisetraveller.model.User;
 import com.madalin.wisetraveller.model.WiseTravellerUserDetails;
+import com.madalin.wisetraveller.model.enums.FacebookProfilePictureType;
 import com.madalin.wisetraveller.model.enums.TipUser;
 import com.madalin.wisetraveller.repository.UserRepository;
 import lombok.AllArgsConstructor;
@@ -25,6 +27,7 @@ public class UserService {
     private AuthorizationCodeService authorizationCodeService;
     private GoogleIdTokenVerifier googleIdTokenVerifier;
     private FacebookAccessTokenApi facebookAccessTokenApi;
+    private FacebookProfilePictureApi facebookProfilePictureApi;
     private UserRepository userRepository;
 
     private static final String credentialsDefault = "N/A";
@@ -67,22 +70,19 @@ public class UserService {
 
     private User createGoogleUser(GoogleIdToken token) {
         User user = new User();
-        String nume = token.getPayload().get("name").toString();
-        user.setNume(nume == null ? "User" : nume);
-        user.setEmail(token.getPayload().getEmail());
-        user.setUsername(user.getEmail());
         user.setUserProvidedId(token.getPayload().getSubject());
         user.setTipUser(TipUser.Google);
+        updateGoogleUser(user, token);
         userRepository.save(user);
         return user;
     }
 
     private void updateGoogleUser(User user, GoogleIdToken token) {
+        String nume = token.getPayload().get("given_name").toString();
+        String prenume = token.getPayload().get("family_name").toString();
+        setNames(user, nume, prenume);
         user.setEmail(token.getPayload().getEmail());
-        user.setUsername(user.getEmail());
-        String nume = token.getPayload().get("name").toString();
-        if (nume != null)
-            user.setNume(nume);
+        user.setUrlProfil(token.getPayload().get("picture").toString());
         userRepository.save(user);
     }
 
@@ -90,7 +90,7 @@ public class UserService {
         try {
             FacebookApiResponse response = facebookAccessTokenApi.verify(accessToken);
             Optional<User> user = userRepository.findByUserProvidedIdAndTipUser(response.getId(), TipUser.Facebook);
-            user.ifPresent(x -> updateFacebookUser(x, response));
+            user.ifPresent(x -> updateFacebookUser(response, x));
             WiseTravellerUserDetails userDetails = WiseTravellerUserDetailsService.createUserDetails(user.orElseGet(
                     ()-> createFacebookUser(response)));
             OAuth2Authentication authentication = createOAuth2Authentication(userDetails);
@@ -102,33 +102,33 @@ public class UserService {
 
     private User createFacebookUser(FacebookApiResponse response) {
         User user = new User();
-        setNamesFacebook(response, user);
         user.setUserProvidedId(response.getId());
         user.setTipUser(TipUser.Facebook);
-        userRepository.save(user);
+        updateFacebookUser(response, user);
         return user;
     }
 
-    private void setNamesFacebook(FacebookApiResponse response, User user) {
+    private void updateFacebookUser(FacebookApiResponse response, User user) {
         String nume = response.get("first_name");
-        if (nume != null && !nume.trim().isEmpty())
-            user.setNume(nume);
         String prenume = response.get("last_name");
-        if (prenume != null && !prenume.trim().isEmpty())
-            user.setPrenume(prenume);
-        if (user.getNume() == null && user.getPrenume() == null)
-            user.setNume("User");
+        setNames(user, nume, prenume);
         String email = response.get("email");
         String fullname = (nume + " " + prenume).trim();
         user.setEmail(email == null ? fullname.replaceAll("\\s", "").toLowerCase()
                 + "@facebook.com" : email);
-        user.setUsername(user.getEmail());
-        user.setUrlProfil("");
+        FacebookProfilePictureResponse profile = facebookProfilePictureApi.getProfilePicture(response.getId(),
+                FacebookProfilePictureType.Large);
+        user.setUrlProfil(profile.getData().getUrl());
+        userRepository.save(user);
     }
 
-    private void updateFacebookUser(User user, FacebookApiResponse response) {
-        setNamesFacebook(response, user);
-        userRepository.save(user);
+    private void setNames(User user, String nume, String prenume) {
+        if (nume != null && !nume.trim().isEmpty())
+            user.setNume(nume);
+        if (prenume != null && !prenume.trim().isEmpty())
+            user.setPrenume(prenume);
+        if (user.getNume() == null && user.getPrenume() == null)
+            user.setNume("User");
     }
 
     public List<User> getAll() {

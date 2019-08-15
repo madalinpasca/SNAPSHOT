@@ -15,7 +15,7 @@ public class GoogleIdTokenVerifierBeanWrapper {
     private GoogleIdTokenVerifier googleIdTokenVerifier = null;
 
     @SuppressWarnings("WeakerAccess")
-    public static final String googleClientId = "";
+    public static final String googleClientId = "216644568526-rfnee6msqb997vnblcba67mj1auprkaq.apps.googleusercontent.com";
     private static final List<String> issuers = Arrays.asList("accounts.google.com", "https://accounts.google.com");
     @Bean
     GoogleIdTokenVerifier googleIdTokenVerifier() {
