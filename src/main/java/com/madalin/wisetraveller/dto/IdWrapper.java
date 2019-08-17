@@ -7,9 +7,8 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
-public class FacebookAccessTokenDto {
-    private String value;
-    private String phoneNumber;
+@AllArgsConstructor
+public class IdWrapper {
+    private Long id;
 }

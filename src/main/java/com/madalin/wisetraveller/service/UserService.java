@@ -12,6 +12,8 @@ import com.madalin.wisetraveller.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.OAuth2Request;
 import org.springframework.stereotype.Service;
@@ -48,9 +50,9 @@ public class UserService {
                 userDetails.getAuthorities()));
     }
 
-    public String getAuthorizationCodeGoogle(String idToken) {
+    public String getAuthorizationCodeGoogle(String idToken, String phoneNumber) {
         try {
-            GoogleIdToken token = googleIdTokenVerifier.verify(idToken);
+                GoogleIdToken token = googleIdTokenVerifier.verify(idToken);
             if (token == null ||
                     !token.getPayload().get("aud").toString().equals(googleClientId) ||
                     !token.getPayload().getEmailVerified()) {
@@ -58,9 +60,12 @@ public class UserService {
             }
             Optional<User> user = userRepository.findByUserProvidedIdAndTipUser(token.getPayload().getSubject(),
                     TipUser.Google);
-            user.ifPresent(x -> updateGoogleUser(x, token));
-            WiseTravellerUserDetails userDetails = WiseTravellerUserDetailsService.createUserDetails(user.orElseGet(
-                    ()-> createGoogleUser(token)));
+            user.ifPresent(x->updateGoogleUser(x, token));
+            if (!user.isPresent() && phoneNumber == null) {
+                return idToken;
+            }
+            WiseTravellerUserDetails userDetails = WiseTravellerUserDetailsService.createUserDetails(
+                    user.orElseGet(() -> createGoogleUser(token, phoneNumber)));
             OAuth2Authentication authentication = createOAuth2Authentication(userDetails);
             return authorizationCodeService.createAuthorizationCode(authentication);
         } catch (Exception ex) {
@@ -68,10 +73,11 @@ public class UserService {
         }
     }
 
-    private User createGoogleUser(GoogleIdToken token) {
+    private User createGoogleUser(GoogleIdToken token, String phoneNumber) {
         User user = new User();
         user.setUserProvidedId(token.getPayload().getSubject());
         user.setTipUser(TipUser.Google);
+        user.setTelefon(phoneNumber);
         updateGoogleUser(user, token);
         userRepository.save(user);
         return user;
@@ -86,13 +92,16 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public String getAuthorizationCodeFacebook(String accessToken) {
+    public String getAuthorizationCodeFacebook(String accessToken, String phoneNumber) {
         try {
             FacebookApiResponse response = facebookAccessTokenApi.verify(accessToken);
             Optional<User> user = userRepository.findByUserProvidedIdAndTipUser(response.getId(), TipUser.Facebook);
             user.ifPresent(x -> updateFacebookUser(response, x));
+            if (!user.isPresent() && phoneNumber == null) {
+                return accessToken;
+            }
             WiseTravellerUserDetails userDetails = WiseTravellerUserDetailsService.createUserDetails(user.orElseGet(
-                    ()-> createFacebookUser(response)));
+                    ()-> createFacebookUser(response, phoneNumber)));
             OAuth2Authentication authentication = createOAuth2Authentication(userDetails);
             return authorizationCodeService.createAuthorizationCode(authentication);
         } catch (Exception ex) {
@@ -100,10 +109,11 @@ public class UserService {
         }
     }
 
-    private User createFacebookUser(FacebookApiResponse response) {
+    private User createFacebookUser(FacebookApiResponse response, String phoneNumber) {
         User user = new User();
         user.setUserProvidedId(response.getId());
         user.setTipUser(TipUser.Facebook);
+        user.setTelefon(phoneNumber);
         updateFacebookUser(response, user);
         return user;
     }
@@ -133,5 +143,42 @@ public class UserService {
 
     public List<User> getAll() {
         return repository.findAll();
+    }
+
+    public Long register(User user) {
+        user.setTipUser(TipUser.Local);
+        userRepository.save(user);
+        return user.getId();
+    }
+
+    public User getCurrent() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        WiseTravellerUserDetails details = null;
+        if (principal instanceof WiseTravellerUserDetails)
+            details = (WiseTravellerUserDetails) principal;
+        if (details == null) {
+            throw new RuntimeException("No current user");
+        }
+        return repository.findById(details.getId()).orElseThrow(()-> new RuntimeException("No current user"));
+    }
+
+    public String getAvatarPath(User user) {
+        return "avatar/"+user.getId();
+    }
+
+    public String getAvatarPath(Long id, String extension) {
+        User user = repository.findById(id).orElseThrow(()->new RuntimeException("No user with that id"));
+        return "avatar/"+user.getId() + "." + extension;
+    }
+
+    public void changeAvatarPath(User user, String imageExtension) {
+        user.setUrlProfil("http://localhost:8080/unauthenticated/avatar/" +
+                user.getId().toString() +
+                "." + imageExtension);
+        repository.save(user);
+    }
+
+    public User get(Long id) {
+        return repository.findById(id).orElseThrow(()->new RuntimeException("FUCK_YOU"));
     }
 }

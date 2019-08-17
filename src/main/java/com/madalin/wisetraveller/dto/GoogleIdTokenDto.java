@@ -11,4 +11,5 @@ import lombok.Setter;
 @NoArgsConstructor
 public class GoogleIdTokenDto {
     private String value;
+    private String phoneNumber;
 }

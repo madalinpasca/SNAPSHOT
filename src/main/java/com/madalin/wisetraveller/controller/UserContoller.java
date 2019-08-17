@@ -1,19 +1,24 @@
 package com.madalin.wisetraveller.controller;
 
-import com.madalin.wisetraveller.dto.AuthorizationCodeDto;
-import com.madalin.wisetraveller.dto.FacebookAccessTokenDto;
-import com.madalin.wisetraveller.dto.GoogleIdTokenDto;
+import com.madalin.wisetraveller.dto.*;
+import com.madalin.wisetraveller.dto.mapper.UserMapper;
+import com.madalin.wisetraveller.model.User;
+import com.madalin.wisetraveller.service.FileService;
 import com.madalin.wisetraveller.service.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @AllArgsConstructor(onConstructor = @__({@Autowired}))
 public class UserContoller {
     private UserService userService;
+    private UserMapper userMapper;
+    private FileService fileService;
 
     @GetMapping("/authenticated/getAll")
     public ResponseEntity<?> buuuun (){
@@ -23,12 +28,50 @@ public class UserContoller {
     @PostMapping("/unauthenticated/authorize/google")
     public ResponseEntity<AuthorizationCodeDto> authorizationCodeGoogle(@RequestBody GoogleIdTokenDto tokenDto) {
         return new ResponseEntity<>(new AuthorizationCodeDto(
-                userService.getAuthorizationCodeGoogle(tokenDto.getValue())), HttpStatus.OK);
+                userService.getAuthorizationCodeGoogle(tokenDto.getValue(), tokenDto.getPhoneNumber())),
+                HttpStatus.OK);
     }
 
     @PostMapping("/unauthenticated/authorize/facebook")
     public ResponseEntity<AuthorizationCodeDto> authorizationCodeFacebook(@RequestBody FacebookAccessTokenDto tokenDto) {
         return new ResponseEntity<>(new AuthorizationCodeDto(
-                userService.getAuthorizationCodeFacebook(tokenDto.getValue())), HttpStatus.OK);
+                userService.getAuthorizationCodeFacebook(tokenDto.getValue(), tokenDto.getPhoneNumber())),
+                HttpStatus.OK);
+    }
+
+    @PostMapping("/unauthenticated/addUser")
+    public ResponseEntity<IdWrapper> addUser(@RequestBody RegisterDto registerDto) {
+        return new ResponseEntity<>(new IdWrapper(userService.register(userMapper.mapRegisterDtoUser(registerDto))),
+                HttpStatus.OK);
+    }
+
+    @PostMapping("/unauthenticated/upload-avatar/{id}")
+    public void upload(@RequestParam("file") MultipartFile file, @PathVariable Long id) {
+        User user = userService.get(id);
+        fileService.saveAsImage(file, userService.getAvatarPath(user));
+        userService.changeAvatarPath(user, fileService.getImageExtension(file));
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/unauthenticated/avatar/{userId}.png", produces = "image/png")
+    public ResponseEntity<?> pngAvatar(@PathVariable Long userId) {
+        return getAvatar(userId, "png");
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/unauthenticated/avatar/{userId}.jpeg", produces = "image/jpeg")
+    public ResponseEntity<?> jpgAvatar(@PathVariable Long userId) {
+        return getAvatar(userId, "jpeg");
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/unauthenticated/avatar/{userId}.bmp", produces = "image/bmp")
+    public ResponseEntity<?> bmpAvatar(@PathVariable Long userId) {
+        return getAvatar(userId, "bmp");
+    }
+
+    private ResponseEntity<?> getAvatar(Long userId, String extension) {
+        Resource resource = fileService.loadAsResource(userService.getAvatarPath(userId, extension));
+        return new ResponseEntity<>(resource, HttpStatus.OK);
     }
 }
