@@ -15,6 +15,7 @@ public class WiseTravellerUserDetails implements UserDetails,CredentialsContaine
     private String password;
     private String username;
     private Long id;
+    private boolean enabled;
 
     @Override
     public boolean isAccountNonExpired() {
@@ -28,11 +29,6 @@ public class WiseTravellerUserDetails implements UserDetails,CredentialsContaine
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
         return true;
     }
 

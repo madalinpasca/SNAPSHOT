@@ -2,22 +2,25 @@ package com.madalin.wisetraveller.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.madalin.wisetraveller.model.FacebookApiResponse;
-import com.madalin.wisetraveller.model.FacebookProfilePictureResponse;
-import com.madalin.wisetraveller.model.User;
-import com.madalin.wisetraveller.model.WiseTravellerUserDetails;
+import com.madalin.wisetraveller.model.*;
+import com.madalin.wisetraveller.model.enums.EmailType;
 import com.madalin.wisetraveller.model.enums.FacebookProfilePictureType;
+import com.madalin.wisetraveller.model.enums.Role;
 import com.madalin.wisetraveller.model.enums.TipUser;
+import com.madalin.wisetraveller.repository.ActivationRepository;
+import com.madalin.wisetraveller.repository.ResetPasswordRequestRepository;
 import com.madalin.wisetraveller.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.OAuth2Request;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static com.madalin.wisetraveller.service.GoogleIdTokenVerifierBeanWrapper.googleClientId;
@@ -31,6 +34,10 @@ public class UserService {
     private FacebookAccessTokenApi facebookAccessTokenApi;
     private FacebookProfilePictureApi facebookProfilePictureApi;
     private UserRepository userRepository;
+    private EmailService emailService;
+    private ActivationRepository activationRepository;
+    private ResetPasswordRequestRepository resetPasswordRequestRepository;
+    private PasswordEncoder userPasswordEncoder;
 
     private static final String credentialsDefault = "N/A";
 
@@ -65,7 +72,7 @@ public class UserService {
                 return idToken;
             }
             WiseTravellerUserDetails userDetails = WiseTravellerUserDetailsService.createUserDetails(
-                    user.orElseGet(() -> createGoogleUser(token, phoneNumber)));
+                    user.orElseGet(() -> createGoogleUser(token, phoneNumber)), true);
             OAuth2Authentication authentication = createOAuth2Authentication(userDetails);
             return authorizationCodeService.createAuthorizationCode(authentication);
         } catch (Exception ex) {
@@ -75,6 +82,8 @@ public class UserService {
 
     private User createGoogleUser(GoogleIdToken token, String phoneNumber) {
         User user = new User();
+        user.setUserRoles(new HashSet<>());
+        user.getUserRoles().add(new UserRole(null, Role.User, user));
         user.setUserProvidedId(token.getPayload().getSubject());
         user.setTipUser(TipUser.Google);
         user.setTelefon(phoneNumber);
@@ -101,7 +110,7 @@ public class UserService {
                 return accessToken;
             }
             WiseTravellerUserDetails userDetails = WiseTravellerUserDetailsService.createUserDetails(user.orElseGet(
-                    ()-> createFacebookUser(response, phoneNumber)));
+                    ()-> createFacebookUser(response, phoneNumber)), true);
             OAuth2Authentication authentication = createOAuth2Authentication(userDetails);
             return authorizationCodeService.createAuthorizationCode(authentication);
         } catch (Exception ex) {
@@ -111,6 +120,8 @@ public class UserService {
 
     private User createFacebookUser(FacebookApiResponse response, String phoneNumber) {
         User user = new User();
+        user.setUserRoles(new HashSet<>());
+        user.getUserRoles().add(new UserRole(null, Role.User, user));
         user.setUserProvidedId(response.getId());
         user.setTipUser(TipUser.Facebook);
         user.setTelefon(phoneNumber);
@@ -148,6 +159,18 @@ public class UserService {
     public Long register(User user) {
         user.setTipUser(TipUser.Local);
         userRepository.save(user);
+        String uuid = UUID.randomUUID().toString();
+        if (EmailService.isEmailValid(user.getEmail())) {
+            emailService.send(user.getEmail(), new Email.Builder(EmailType.Activation).
+                    contentArguments(user.getId(), uuid)
+                    .build());
+        }
+        activationRepository.save(new Activation(null,
+                user.getId(),
+                uuid,
+                LocalDateTime.now().plusDays(30),
+                false
+        ));
         return user.getId();
     }
 
@@ -179,6 +202,42 @@ public class UserService {
     }
 
     public User get(Long id) {
-        return repository.findById(id).orElseThrow(()->new RuntimeException("FUCK_YOU"));
+        return repository.findById(id).orElseThrow(()->new RuntimeException("No user with that id"));
+    }
+
+    public void activate(String uuid, Long id) {
+        userRepository.findById(id).orElseThrow(()->new RuntimeException("No user with that id"));
+        Activation activation = activationRepository.findByUserIdAndUuid(id, uuid).orElseThrow(
+                ()->new RuntimeException("Uuid is not valid!")
+        );
+        activation.setActivated(true);
+        activationRepository.save(activation);
+    }
+
+    public void resetPassword(String uuid, Long id) {
+        User user = userRepository.findById(id).orElseThrow(()->new RuntimeException("No user with that id"));
+        ResetPasswordRequest request = resetPasswordRequestRepository.findByUserIdAndUuid(id, uuid)
+                .orElseThrow(()->new RuntimeException("Uuid is not valid!"));
+        user.setParola(request.getPassword());
+        resetPasswordRequestRepository.delete(request);
+        userRepository.save(user);
+    }
+
+    public void resetPassword(String email, String password) {
+        User user = userRepository.findByEmailAndTipUser(email, TipUser.Local).orElseThrow(
+                ()-> new RuntimeException("No user with that email")
+        );
+        String uuid = UUID.randomUUID().toString();
+        if (EmailService.isEmailValid(user.getEmail())) {
+            emailService.send(user.getEmail(), new Email.Builder(EmailType.ResetPassword).
+                    contentArguments(user.getId(), uuid)
+                    .build());
+        }
+        ResetPasswordRequest request = resetPasswordRequestRepository.findByUserId(user.getId())
+                .orElse(new ResetPasswordRequest());
+        request.setUserId(user.getId());
+        request.setUuid(uuid);
+        request.setPassword(userPasswordEncoder.encode(password));
+        resetPasswordRequestRepository.save(request);
     }
 }

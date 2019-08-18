@@ -1,6 +1,8 @@
 buildscript {
     ext {
+        //noinspection GroovyAssignabilityCheck
         springBootVersion = '2.1.2.RELEASE'
+        //noinspection GroovyAssignabilityCheck
         jacksonVersion = '2.9.9'
     }
     repositories {
@@ -32,6 +34,6 @@ dependencies {
     compile "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
     compile group: 'com.google.api-client', name: 'google-api-client', version: '1.28.0'
     compile group: 'org.postgresql', name: 'postgresql', version: '42.2.5'
-//    compile group: 'javax.mail', name: 'mail', version: '1.4.7'
+    compile group: 'javax.mail', name: 'mail', version: '1.4.7'
 //    compileOnly group: 'javax.servlet', name: 'javax.servlet-api', version: '4.0.1'
 }

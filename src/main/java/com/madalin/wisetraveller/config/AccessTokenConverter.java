@@ -19,7 +19,7 @@ public class AccessTokenConverter extends JwtAccessTokenConverter {
         if (authentication == null)
             return oAuth2Authentication;
         String username = (String)claims.get("name");
-        Long id = (Long)claims.get("id");
+        Long id = ((Integer)claims.get("id")).longValue();
         return new OAuth2Authentication(oAuth2Authentication.getOAuth2Request(), new UsernamePasswordAuthenticationToken(
                         WiseTravellerUserDetails.builder()
                                 .authorities(authentication.getAuthorities())

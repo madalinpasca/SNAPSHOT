@@ -52,6 +52,23 @@ public class UserContoller {
         userService.changeAvatarPath(user, fileService.getImageExtension(file));
     }
 
+    @GetMapping("/unauthenticated/activate")
+    public ResponseEntity<?> activateUser(@RequestParam String uuid, @RequestParam Long id) {
+        userService.activate(uuid, id);
+        return new ResponseEntity<>("<script type=\"text/javascript\">window.close();</script>", HttpStatus.OK);
+    }
+
+    @PostMapping("/unauthenticated/resetPassword/")
+    public void resetPassword(@RequestBody ResetPasswordDto dto) {
+        userService.resetPassword(dto.getEmail(), dto.getPassword());
+    }
+
+    @GetMapping("/unauthenticated/resetPassword")
+    public ResponseEntity<?> resetPassword(@RequestParam String uuid, @RequestParam Long id) {
+        userService.resetPassword(uuid, id);
+        return new ResponseEntity<>("<script type=\"text/javascript\">window.close();</script>", HttpStatus.OK);
+    }
+
     @ResponseBody
     @GetMapping(value = "/unauthenticated/avatar/{userId}.png", produces = "image/png")
     public ResponseEntity<?> pngAvatar(@PathVariable Long userId) {
@@ -73,5 +90,10 @@ public class UserContoller {
     private ResponseEntity<?> getAvatar(Long userId, String extension) {
         Resource resource = fileService.loadAsResource(userService.getAvatarPath(userId, extension));
         return new ResponseEntity<>(resource, HttpStatus.OK);
+    }
+
+    @PostMapping("/authenticated/me")
+    public ResponseEntity<UserDto> getDetails() {
+        return new ResponseEntity<>(userMapper.mapUser(userService.getCurrent()), HttpStatus.OK);
     }
 }
